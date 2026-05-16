@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String      @id @unique
+  telegramId           BigInt      @unique
+  username             String?
+  firstName            String?
+  lastName             String?
+  photoUrl             String?
+  languageCode         String?     @default("ru")
+  
+  // Лояльность
+  loyaltyBalance       Int         @default(0)
+  loyaltyLevel         String      @default("novice")
+  totalSpent           Float       @default(0)
+  referralCode         String      @unique @default(cuid())
+  referredBy           String?
+  
+  // История
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  lastOrderAt          DateTime?
+  
+  // Отношения
+  orders               Order[]
+  spinHistory          BonusSpin[]
+  dailyChallenges      UserChallenge[]
+  preferences          UserPreference?
+  
+  @@index([telegramId])
+}
+
+model UserPreference {
+  id                   String      @id @default(cuid())
+  userId               String      @unique
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  favoriteCategories   String[]    @default([])
+  allergies            String[]    @default([])
+  temperature          String?     @default("hot")
+  sugarLevel           String?     @default("medium")
+  
+  updatedAt            DateTime    @updatedAt
+}
+
+model MenuItem {
+  id                   String      @id @default(cuid())
+  name                 String
+  nameEn               String?
+  description          String?
+  category             String
+  price                Float
+  bonusMultiplier      Float       @default(1.0)
+  image                String?
+  available            Boolean     @default(true)
+  
+  weatherTag           String[]    @default([])
+  timeOptimal          String[]    @default([])
+  
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  
+  orderItems           OrderItem[]
+}
+
+model Order {
+  id                   String      @id @default(cuid())
+  userId               String
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status               String      @default("pending")
+  paymentMethod        String
+  totalPrice           Float
+  bonusSpent           Int         @default(0)
+  bonusEarned          Int         @default(0)
+  
+  pickupTime           DateTime?
+  qrCode               String      @unique @default(cuid())
+  barista              String?
+  
+  createdAt            DateTime    @default(now())
+  completedAt          DateTime?
+  
+  items                OrderItem[]
+  
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id                   String      @id @default(cuid())
+  orderId              String
+  order                Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  menuItemId           String
+  menuItem             MenuItem    @relation(fields: [menuItemId], references: [id])
+  
+  quantity             Int         @default(1)
+  addons               String[]    @default([])
+  notes                String?
+  price                Float
+}
+
+model BonusSpin {
+  id                   String      @id @default(cuid())
+  userId               String
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  reward               Int
+  spinType             String      @default("daily")
+  
+  createdAt            DateTime    @default(now())
+}
+
+model DailyChallenge {
+  id                   String      @id @default(cuid())
+  title                String
+  description          String?
+  icon                 String?
+  reward               Int
+  condition            String
+  
+  active               Boolean     @default(true)
+  startDate            DateTime
+  endDate              DateTime
+  
+  userChallenges       UserChallenge[]
+}
+
+model UserChallenge {
+  id                   String      @id @default(cuid())
+  userId               String
+  user                 User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  challengeId          String
+  challenge            DailyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  
+  progress             Int         @default(0)
+  completed            Boolean     @default(false)
+  completedAt          DateTime?
+  rewardClaimed        Boolean     @default(false)
+  
+  createdAt            DateTime    @default(now())
+  
+  @@unique([userId, challengeId])
+}
+
+model AdminUser {
+  id                   String      @id @default(cuid())
+  telegramId           BigInt      @unique
+  username             String?
+  role                 String      @default("staff")
+  accessLevel          Int         @default(1)
+  
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+}
